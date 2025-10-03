@@ -44,6 +44,10 @@ if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   add_compile_definitions(__cpp_concepts=202002L)
 endif()
 
+# Options
+option(ENABLE_JPEGXL "Enable libjxl (JPEG XL support)" ON)
+option(ENABLE_HEIF "Enable libheif (AVIF/HEIF image support)" ON)
+
 file(GLOB_RECURSE SRCFILES CONFIGURE_DEPENDS "src/*.cpp" "include/*.hpp")
 file(GLOB_RECURSE PUBLIC_HEADERS CONFIGURE_DEPENDS "include/*.hpp")
 
@@ -62,47 +66,56 @@ pkg_check_modules(
   libpng
   librsvg-2.0)
 
-pkg_check_modules(
-  JXL
-  IMPORTED_TARGET
-  libjxl
-  libjxl_cms
-  libjxl_threads
-)
-if(NOT JXL_FOUND)
+# Optional JPEGXL
+if(ENABLE_JPEGXL)
+  pkg_check_modules(
+    JXL
+    IMPORTED_TARGET
+    libjxl
+    libjxl_cms
+    libjxl_threads
+  )
+  if(JXL_FOUND)
+    add_compile_definitions(JXL_FOUND)
+    message(STATUS "libjxl support enabled")
+  else()
+    file(GLOB_RECURSE JPEGXLFILES CONFIGURE_DEPENDS "src/*JpegXL.cpp")
+    foreach(f ${JPEGXLFILES})
+      list(REMOVE_ITEM SRCFILES "${f}")
+    endforeach()
+    message(WARNING "libjxl not found, JPEGXL support disabled")
+  endif()
+else()
   file(GLOB_RECURSE JPEGXLFILES CONFIGURE_DEPENDS "src/*JpegXL.cpp")
-  list(REMOVE_ITEM SRCFILES ${JPEGXLFILES})
-else()
-  add_compile_definitions(JXL_FOUND)
+  foreach(f ${JPEGXLFILES})
+    list(REMOVE_ITEM SRCFILES "${f}")
+  endforeach()
+  message(STATUS "JPEGXL support explicitly disabled")
 endif()
 
-pkg_check_modules(
-  HEIF
-  IMPORTED_TARGET
-  libheif
-)
-
-if(NOT HEIF_FOUND)
+# Optional HEIF
+if(ENABLE_HEIF)
+  pkg_check_modules(
+    HEIF
+    IMPORTED_TARGET
+    libheif
+  )
+  if(HEIF_FOUND)
+    add_compile_definitions(HEIF_FOUND)
+    message(STATUS "libheif support enabled")
+  else()
+    file(GLOB_RECURSE HEIFFILES CONFIGURE_DEPENDS "src/*Avif.cpp")
+    foreach(f ${HEIFFILES})
+      list(REMOVE_ITEM SRCFILES "${f}")
+    endforeach()
+    message(WARNING "libheif not found, AVIF/HEIF support disabled")
+  endif()
+else()
   file(GLOB_RECURSE HEIFFILES CONFIGURE_DEPENDS "src/*Avif.cpp")
-  list(REMOVE_ITEM SRCFILES ${HEIFFILES})
-else()
-  add_compile_definitions(HEIF_FOUND)
-endif()
-
-add_library(hyprgraphics SHARED ${SRCFILES})
-target_include_directories(
-  hyprgraphics
-  PUBLIC "./include"
-  PRIVATE "./src")
-set_target_properties(hyprgraphics PROPERTIES VERSION ${HYPRGRAPHICS_VERSION}
-                                              SOVERSION 1)
-target_link_libraries(hyprgraphics PkgConfig::deps)
-if(JXL_FOUND)
-  target_link_libraries(hyprgraphics PkgConfig::JXL)
-endif()
-
-if(HEIF_FOUND)
-  target_link_libraries(hyprgraphics PkgConfig::HEIF)
+  foreach(f ${HEIFFILES})
+    list(REMOVE_ITEM SRCFILES "${f}")
+  endforeach()
+  message(STATUS "libheif support explicitly disabled")
 endif()
 
 # tests
